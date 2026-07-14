@@ -20,41 +20,52 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Install Flet & Tools
+      - name: Install Tools & Dependencies
         run: |
-          pip install flet
+          pip install flet pandas openpyxl
 
-      - name: Find main.py and Build APK Safely
+      - name: Auto-Convert Excel to Static data.py
         run: |
-          echo "=== သင့် Repository ထဲရှိ ဖိုင်များ စာရင်း ==="
-          find . -maxdepth 3 -not -path '*/.*'
-          echo "======================================="
+          python -c "
+          import pandas as pd
+          import json
+          import os
 
-          # စာလုံးအကြီးအသေးမရွေး main.py ကို အရင်ရှာမည်
-          TARGET_FILE=$(find . -iname "main.py" | head -n 1)
+          excel_file = 'Barmill Offer.xlsx'
+          if os.path.exists(excel_file):
+              print('အောင်မြင်သည်: Excel ဖိုင်ကို တွေ့ရှိသဖြင့် ဒေတာပြောင်းလဲခြင်း စတင်ပါမည်။')
+              df = pd.read_excel(excel_file)
+              
+              # ကော်လံခေါင်းစဉ်များရှိ \n (newline) များကို space ဖြင့် အစားထိုးပြီး သန့်စင်ခြင်း
+              df.columns = [str(c).replace('\n', ' ').replace('\r', ' ').strip() for c in df.columns]
+              
+              items = []
+              for _, row in df.iterrows():
+                  item_data = {}
+                  for col in df.columns:
+                      val = row[col]
+                      if pd.isna(val):
+                          item_data[col] = ''
+                      elif isinstance(val, float) and val.is_integer():
+                          item_data[col] = str(int(val))
+                      else:
+                          item_data[col] = str(val).strip()
+                  
+                  if any(v != '' for v in item_data.values()):
+                      items.append(item_data)
+              
+              with open('data.py', 'w', encoding='utf-8') as f:
+                  f.write('# GitHub Actions မှ အလိုအလျောက် ထုတ်လုပ်ပေးထားသော ဒေတာဖိုင်\n')
+                  f.write('offers = ' + json.dumps(items, indent=4, ensure_ascii=False) + '\n')
+              print('အောင်မြင်သည်: data.py ကို ပစ္စည်းစုစုပေါင်း', len(items), 'ခုဖြင့် တည်ဆောက်ပြီးပါပြီ။')
+          else:
+              print('သတိပေးချက်: Barmill Offer.xlsx ကို ရှာမတွေ့ပါ။ ဗလာဒေတာဖြင့် ဆက်သွားပါမည်။')
+              with open('data.py', 'w', encoding='utf-8') as f:
+                  f.write('offers = []\n')
+          "
 
-          # ရှာမတွေ့ပါက data.py နှင့် convert.py မဟုတ်သော အခြား .py ဖိုင်ကို ရှာမည်
-          if [ -z "$TARGET_FILE" ]; then
-            TARGET_FILE=$(find . -name "*.py" ! -name "data.py" ! -name "convert.py" | head -n 1)
-          fi
-
-          if [ -z "$TARGET_FILE" ]; then
-            echo "Error: Python (.py) ဖိုင်လုံးဝ ရှာမတွေ့ပါ။"
-            echo "သင့် Repository ထဲမှာ main.py ဖိုင် တင်ထားခြင်း ရှိမရှိ သေချာပြန်စစ်ပေးပါ။"
-            exit 1
-          fi
-
-          TARGET_DIR=$(dirname "$TARGET_FILE")
-          FILE_NAME=$(basename "$TARGET_FILE")
-          
-          cd "$TARGET_DIR"
-          # Flet Build ရန်အတွက် နာမည်ကို main.py ဟု ပြောင်းလဲပေးခြင်း
-          if [ "$FILE_NAME" != "main.py" ]; then
-            echo "တွေ့ရှိသောဖိုင် '$FILE_NAME' ကို Flet အတွက် 'main.py' ဟု အလိုအလျောက် နာမည်ပြောင်းပေးလိုက်သည်။"
-            mv "$FILE_NAME" main.py
-          fi
-
-          echo "အောင်မြင်သည် - Build စတင်လုပ်ဆောင်ပါမည်။"
+      - name: Build APK File
+        run: |
           echo "y" | flet build apk
 
       - name: Upload APK Result
