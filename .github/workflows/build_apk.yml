@@ -20,56 +20,75 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Install Tools & Dependencies
+      - name: Install dependencies
         run: |
-          pip install flet pandas openpyxl
+          pip install flet openpyxl
 
-      - name: Auto-Convert Excel to Static data.py
+      - name: Convert Excel to JSON with verification
         run: |
           python -c "
-          import pandas as pd
-          import json
-          import os
+import openpyxl
+import json
+import os
 
-          excel_file = 'Barmill Offer.xlsx'
-          if os.path.exists(excel_file):
-              print('အောင်မြင်သည်: Excel ဖိုင်ကို တွေ့ရှိသဖြင့် ဒေတာပြောင်းလဲခြင်း စတင်ပါမည်။')
-              df = pd.read_excel(excel_file)
-              
-              # ကော်လံခေါင်းစဉ်များရှိ \n (newline) များကို space ဖြင့် အစားထိုးပြီး သန့်စင်ခြင်း
-              df.columns = [str(c).replace('\n', ' ').replace('\r', ' ').strip() for c in df.columns]
-              
-              items = []
-              for _, row in df.iterrows():
-                  item_data = {}
-                  for col in df.columns:
-                      val = row[col]
-                      if pd.isna(val):
-                          item_data[col] = ''
-                      elif isinstance(val, float) and val.is_integer():
-                          item_data[col] = str(int(val))
-                      else:
-                          item_data[col] = str(val).strip()
-                  
-                  if any(v != '' for v in item_data.values()):
-                      items.append(item_data)
-              
-              with open('data.py', 'w', encoding='utf-8') as f:
-                  f.write('# GitHub Actions မှ အလိုအလျောက် ထုတ်လုပ်ပေးထားသော ဒေတာဖိုင်\n')
-                  f.write('offers = ' + json.dumps(items, indent=4, ensure_ascii=False) + '\n')
-              print('အောင်မြင်သည်: data.py ကို ပစ္စည်းစုစုပေါင်း', len(items), 'ခုဖြင့် တည်ဆောက်ပြီးပါပြီ။')
-          else:
-              print('သတိပေးချက်: Barmill Offer.xlsx ကို ရှာမတွေ့ပါ။ ဗလာဒေတာဖြင့် ဆက်သွားပါမည်။')
-              with open('data.py', 'w', encoding='utf-8') as f:
-                  f.write('offers = []\n')
-          "
+file_path = 'Barmill Offer.xlsx'
 
-      - name: Build APK File
+if not os.path.exists(file_path):
+    print('❌ ERROR: Barmill Offer.xlsx file not found!')
+    print('Please make sure the file is in the repository root.')
+    exit(1)
+
+print(f'✅ Found Excel file: {file_path}')
+
+try:
+    wb = openpyxl.load_workbook(file_path, data_only=True)
+    sheet = wb.active
+except Exception as e:
+    print(f'❌ ERROR loading Excel: {e}')
+    exit(1)
+
+# Get headers
+headers = []
+for col in range(1, sheet.max_column + 1):
+    val = sheet.cell(row=1, column=col).value
+    headers.append(str(val).strip() if val else f'Col{col}')
+
+offers = []
+for row in range(2, sheet.max_row + 1):
+    row_data = {}
+    empty = True
+    for col_idx, header in enumerate(headers, start=1):
+        cell_value = sheet.cell(row=row, column=col_idx).value
+        if cell_value is not None and str(cell_value).strip() != '':
+            row_data[header] = str(cell_value).strip()
+            empty = False
+        else:
+            row_data[header] = ''
+    if not empty:
+        offers.append(row_data)
+
+# Save JSON
+with open('data.json', 'w', encoding='utf-8') as f:
+    json.dump(offers, f, ensure_ascii=False, indent=2)
+
+print(f'✅ Success! Converted {len(offers)} items to data.json')
+"
+      - name: Verify data.json exists
         run: |
-          echo "y" | flet build apk
+          if [ -f "data.json" ]; then
+            echo "✅ data.json exists"
+            cat data.json | head -n 20
+          else
+            echo "❌ data.json was not created!"
+            exit 1
+          fi
 
-      - name: Upload APK Result
+      - name: Build APK
+        run: |
+          flet build apk
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Barmill-Offer-App
-          path: "**/build/apk/*.apk"
+          path: "build/apk/*.apk"
