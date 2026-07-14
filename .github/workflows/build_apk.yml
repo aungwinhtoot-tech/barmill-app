@@ -24,12 +24,24 @@ jobs:
         run: |
           pip install flet
 
-      - name: Build APK File
+      - name: Find main.py and Build APK Safely
         run: |
-          yes | flet build apk
+          # ၁။ Repository တစ်ခုလုံးထဲမှာ main.py ရှိတဲ့ Folder ကို အလိုအလျောက် ရှာဖွေခြင်း
+          TARGET_DIR=$(find . -name "main.py" -exec dirname {} \; | head -n 1)
+          
+          if [ -z "$TARGET_DIR" ]; then
+            echo "Error: main.py ကို သင့် Repository ထဲမှာ ရှာမတွေ့ပါ။ ဖိုင်တင်ထားခြင်း ရှိမရှိ ပြန်စစ်ပါ။"
+            exit 1
+          fi
+          
+          echo "အောင်မြင်သည် - main.py ကို ဤ Folder တွင် တွေ့ရှိရသည်: $TARGET_DIR"
+          cd "$TARGET_DIR"
+          
+          # ၂။ ပတ်ချာလည် အမှားမတက်စေရန် echo "y" ကိုသာ သုံးပြီး Flutter သွင်းခြင်းကို ခွင့်ပြုမည်
+          echo "y" | flet build apk
 
       - name: Upload APK Result
         uses: actions/upload-artifact@v4
         with:
           name: Barmill-Offer-App
-          path: build/apk/*.apk
+          path: "**/build/apk/*.apk"
