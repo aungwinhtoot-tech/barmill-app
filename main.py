@@ -1,49 +1,58 @@
 import flet as ft
-import data  # data.py ကနေ offers ကို ယူမယ်
+import data
+import traceback
 
 def main(page: ft.Page):
-    page.title = "Barmill Offer - Spare Parts"
+    page.title = "Barmill Offer"
     page.scroll = ft.ScrollMode.ADAPTIVE
-    page.padding = 15
+    page.padding = 20
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
-    # ခေါင်းစီး
-    header = ft.Text("🛠️ Barmill Offer - အစိတ်အပိုင်းစာရင်း", size=24, weight=ft.FontWeight.BOLD)
+    try:
+        # data.offers ကို စစ်မယ်
+        if not data.offers:
+            page.add(
+                ft.Container(
+                    content=ft.Text(
+                        "⚠️ ဒေတာမရှိပါ။\n\ndata.json ဖိုင် မပါဝင်နိုင်ပါ။",
+                        size=18,
+                        color=ft.colors.RED_700,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    padding=30,
+                    bgcolor=ft.colors.RED_50,
+                    border_radius=10,
+                )
+            )
+            return
 
-    # ดေတာကို Table နဲ့ပြမယ်
-    if not hasattr(data, 'offers') or not data.offers:
-        content = ft.Text("Excel ဖိုင်မရှိပါ သို့မဟုတ် ဒေတာဗလာဖြစ်နေသည်။", size=16, color=ft.colors.RED_700)
-    else:
-        # Table columns သတ်မှတ်ခြင်း
+        # ဇယားခေါင်းစဉ်များ
         columns = [
-            ft.DataColumn(ft.Text("No.", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Item", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Code", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Drawing No.", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Price (USD)", weight=ft.FontWeight.BOLD)),
+            ft.DataColumn(ft.Text("No.", weight="bold")),
+            ft.DataColumn(ft.Text("Item", weight="bold")),
+            ft.DataColumn(ft.Text("Code", weight="bold")),
+            ft.DataColumn(ft.Text("Drawing", weight="bold")),
+            ft.DataColumn(ft.Text("Price (USD)", weight="bold")),
         ]
 
         rows = []
-        for item in data.offers[:100]:  # ပထမ ၁၀၀ ခုပဲပြမည်
-            # Key နာမည်တွင် \n ပါသည်ဖြစ်စေ၊ မပါသည်ဖြစ်စေ ဖတ်နိုင်ရန် ပြင်ဆင်ခြင်း
-            price_val = item.get("Unit Price (USD)") or item.get("Unit Price\n(USD)") or ""
-            drawing_val = item.get("96/3805 Drawing no.") or item.get("96/3805 Drawing no.\n") or ""
-
-            rows.append(
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text(str(item.get("No.", "")))),
-                        ft.DataCell(ft.Text(str(item.get("Item", "")))),
-                        ft.DataCell(ft.Text(str(item.get("Code", "")))),
-                        # စာသားရှည်များ စခရင်ညှပ်မသွားစေရန် max_lines သတ်မှတ်ခြင်း
-                        ft.DataCell(ft.Text(str(drawing_val), max_lines=2)),
-                        ft.DataCell(ft.Text(str(price_val))),
-                    ]
+        for idx, item in enumerate(data.offers[:200]):
+            try:
+                rows.append(
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(str(item.get("No.", "")))),
+                            ft.DataCell(ft.Text(str(item.get("Item", "")))),
+                            ft.DataCell(ft.Text(str(item.get("Code", "")))),
+                            ft.DataCell(ft.Text(str(item.get("96/3805 Drawing no.", "")), max_lines=2)),
+                            ft.DataCell(ft.Text(str(item.get("Unit Price (USD)", "")))),
+                        ]
+                    )
                 )
-            )
+            except Exception as row_error:
+                print(f"Row {idx} error: {row_error}")
 
-        # ဇယားဆောက်ခြင်း (width ကို page.width မသုံးဘဲ Auto ထားသည်)
-        datatable = ft.DataTable(
+        table = ft.DataTable(
             columns=columns,
             rows=rows,
             border=ft.border.all(1, ft.colors.GREY_400),
@@ -55,23 +64,33 @@ def main(page: ft.Page):
             data_row_max_height=60,
         )
 
-        # ဖုန်းစခရင်ပေါ်တွင် ဘေးတိုက်ရွှေ့ကြည့်နိုင်ရန် Row ထဲသို့ထည့်ပြီး Scroll ပေးခြင်း
-        content = ft.Row(
-            controls=[datatable],
-            scroll=ft.ScrollMode.ALWAYS,  # ဘေးတိုက် အမြဲရွှေ့ကြည့်နိုင်မည်
+        page.add(
+            ft.Text("🛠️ Barmill Offer - Spare Parts", size=28, weight="bold"),
+            ft.Divider(height=10, thickness=2),
+            ft.Container(
+                content=table,
+                padding=10,
+                bgcolor=ft.colors.WHITE,
+                border_radius=10,
+                shadow=ft.BoxShadow(blur_radius=10, color=ft.colors.GREY_300),
+            ),
+            ft.Text(f"စုစုပေါင်း {len(data.offers)} ခု", size=14, color=ft.colors.GREY_600),
         )
 
-    # Page ထဲထည့်မယ်
-    page.add(
-        header,
-        ft.Divider(height=10, thickness=2),
-        ft.Container(
-            content=content,
-            padding=10,
-            bgcolor=ft.colors.WHITE,
-            border_radius=10,
-            shadow=ft.BoxShadow(blur_radius=10, color=ft.colors.GREY_300),
-        ),
-    )
+    except Exception as e:
+        # ဘယ်လို error မဆို blank မဖြစ်အောင်
+        error_text = traceback.format_exc()
+        page.add(
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("❌ Application Error", size=24, color=ft.colors.RED_700),
+                    ft.Text("ကျေးဇူးပြုပြီး အမှားအကြောင်းကို အောက်ပါအတိုင်း Developer ကို ပြန်ပြောပါ။", size=16),
+                    ft.Text(error_text, size=12, color=ft.colors.RED_500, selectable=True),
+                ]),
+                padding=20,
+                bgcolor=ft.colors.RED_50,
+                border_radius=10,
+            )
+        )
 
 ft.app(target=main)
