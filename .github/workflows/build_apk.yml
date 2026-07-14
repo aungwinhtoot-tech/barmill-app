@@ -26,18 +26,35 @@ jobs:
 
       - name: Find main.py and Build APK Safely
         run: |
-          # ၁။ Repository တစ်ခုလုံးထဲမှာ main.py ရှိတဲ့ Folder ကို အလိုအလျောက် ရှာဖွေခြင်း
-          TARGET_DIR=$(find . -name "main.py" -exec dirname {} \; | head -n 1)
-          
-          if [ -z "$TARGET_DIR" ]; then
-            echo "Error: main.py ကို သင့် Repository ထဲမှာ ရှာမတွေ့ပါ။ ဖိုင်တင်ထားခြင်း ရှိမရှိ ပြန်စစ်ပါ။"
+          echo "=== သင့် Repository ထဲရှိ ဖိုင်များ စာရင်း ==="
+          find . -maxdepth 3 -not -path '*/.*'
+          echo "======================================="
+
+          # စာလုံးအကြီးအသေးမရွေး main.py ကို အရင်ရှာမည်
+          TARGET_FILE=$(find . -iname "main.py" | head -n 1)
+
+          # ရှာမတွေ့ပါက data.py နှင့် convert.py မဟုတ်သော အခြား .py ဖိုင်ကို ရှာမည်
+          if [ -z "$TARGET_FILE" ]; then
+            TARGET_FILE=$(find . -name "*.py" ! -name "data.py" ! -name "convert.py" | head -n 1)
+          fi
+
+          if [ -z "$TARGET_FILE" ]; then
+            echo "Error: Python (.py) ဖိုင်လုံးဝ ရှာမတွေ့ပါ။"
+            echo "သင့် Repository ထဲမှာ main.py ဖိုင် တင်ထားခြင်း ရှိမရှိ သေချာပြန်စစ်ပေးပါ။"
             exit 1
           fi
+
+          TARGET_DIR=$(dirname "$TARGET_FILE")
+          FILE_NAME=$(basename "$TARGET_FILE")
           
-          echo "အောင်မြင်သည် - main.py ကို ဤ Folder တွင် တွေ့ရှိရသည်: $TARGET_DIR"
           cd "$TARGET_DIR"
-          
-          # ၂။ ပတ်ချာလည် အမှားမတက်စေရန် echo "y" ကိုသာ သုံးပြီး Flutter သွင်းခြင်းကို ခွင့်ပြုမည်
+          # Flet Build ရန်အတွက် နာမည်ကို main.py ဟု ပြောင်းလဲပေးခြင်း
+          if [ "$FILE_NAME" != "main.py" ]; then
+            echo "တွေ့ရှိသောဖိုင် '$FILE_NAME' ကို Flet အတွက် 'main.py' ဟု အလိုအလျောက် နာမည်ပြောင်းပေးလိုက်သည်။"
+            mv "$FILE_NAME" main.py
+          fi
+
+          echo "အောင်မြင်သည် - Build စတင်လုပ်ဆောင်ပါမည်။"
           echo "y" | flet build apk
 
       - name: Upload APK Result
